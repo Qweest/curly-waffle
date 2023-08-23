@@ -3,5 +3,8 @@
   "singleQuote": true,
   "tabWidth": 2,
   "arrowParens": "avoid",
-  "printWidth": 80
+  "printWidth": 80,
+  "importOrder": ["^react(.*)", "<THIRD_PARTY_MODULES>", "@/(.*)", "^[./]"],
+  "importOrderSeparation": true,
+  "importOrderSortSpecifiers": true
 }
