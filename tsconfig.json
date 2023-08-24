@@ -13,6 +13,10 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "paths": {
+      "@scenes/*": ["src/scenes/*"],
+      "@scripts/*": ["src/scripts/*"],
+      "@shared/*": ["src/shared/*"],
+      "@ui/*": ["src/ui/*"],
       "*": ["node_modules/*"]
     }
   },

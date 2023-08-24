@@ -1,2 +1,2 @@
-import './scenes'
 import './index.css'
+import './scenes'
