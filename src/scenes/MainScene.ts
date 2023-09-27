@@ -1,3 +1,5 @@
+import FPSManager from '@scripts/FPSManager'
+import { INITIAL_FPS } from '@shared/constants'
 import {
   BoxGeometry,
   Mesh,
@@ -44,12 +46,11 @@ class MainScene {
 
     this.camera.position.z = 5
 
-    this.animate()
+    const fpsManager = new FPSManager(INITIAL_FPS, this.animate)
+    fpsManager.start()
   }
 
   private animate() {
-    requestAnimationFrame(this.animate)
-
     this.player.rotation.x += 0.01
     this.player.rotation.y += 0.01
     this.renderer.render(this.scene, this.camera)

@@ -1,1 +1,1 @@
-const INITIAL_FPS = 60
+export const INITIAL_FPS = 60
