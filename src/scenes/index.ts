@@ -1,3 +1,4 @@
-import Workspace from '@scripts/Workspace'
+import MainScene from './MainScene'
 
-const workspace = new Workspace()
+const scene = MainScene.getInstance()
+scene.start()

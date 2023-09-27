@@ -12,6 +12,7 @@
     "outDir": "dist",
     "moduleResolution": "node",
     "resolveJsonModule": true,
+    "strict": true,
     "paths": {
       "@scenes/*": ["src/scenes/*"],
       "@scripts/*": ["src/scripts/*"],
