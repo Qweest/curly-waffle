@@ -1,5 +1,5 @@
 import FPSManager from '@scripts/FPSManager'
-import { INITIAL_FPS } from '@shared/constants'
+import { MAX_FPS } from '@shared/constants'
 import {
   BoxGeometry,
   Mesh,
@@ -46,7 +46,7 @@ class MainScene {
 
     this.camera.position.z = 5
 
-    const fpsManager = new FPSManager(INITIAL_FPS, this.animate)
+    const fpsManager = new FPSManager(MAX_FPS, this.animate)
     fpsManager.start()
   }
 

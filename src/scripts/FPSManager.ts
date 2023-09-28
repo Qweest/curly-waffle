@@ -1,7 +1,7 @@
 class FPSManager {
   private readonly callback: () => void
   private readonly interval: number
-  private then: DOMHighResTimeStamp = 0
+  private then?: DOMHighResTimeStamp = undefined
 
   constructor(fps: number, callback: () => void) {
     this.interval = 1000 / fps
@@ -21,12 +21,14 @@ class FPSManager {
       this.then = timestamp
     }
 
-    const delta = timestamp - this.then
+    const passed = timestamp - this.then
 
-    if (delta > this.interval) {
-      this.then = timestamp - (delta % this.interval)
-      this.callback()
+    if (passed < this.interval) {
+      return
     }
+
+    this.then = timestamp - (passed % this.interval)
+    this.callback()
   }
 }
 
