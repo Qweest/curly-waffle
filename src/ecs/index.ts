@@ -13,6 +13,57 @@ type Entity = number
 abstract class Component {}
 
 /**
+ * This type is so functions like the ComponentContainer's get(...) will
+ * automatically tell TypeScript the type of the Component returned. In
+ * other words, we can say get(Position) and TypeScript will know that an
+ * instance of Position was returned. This is amazingly helpful.
+ */
+type ComponentClass<T extends Component> = new (...args: any[]) => T
+
+/**
+ * This custom container is so that calling code can provide the
+ * Component *instance* when adding (e.g., add(new Position(...))), and
+ * provide the Component *class* otherwise (e.g., get(Position),
+ * has(Position), delete(Position)).
+ *
+ * Two different types used here to refer to the Component's class:
+ * `Function` and `ComponentClass<T>`. We use `Function` in most cases
+ * because it is simpler to write. We use `ComponentClass<T>` in the
+ * `get()` method, when we want TypeScript to know the type of the
+ * instance that is returned. Just think of these both as referring to
+ * the same thing: the underlying class of the Component.
+ */
+class ComponentContainer {
+  private map = new Map<Function, Component>()
+
+  public add(component: Component): void {
+    this.map.set(component.constructor, component)
+  }
+
+  public get<T extends Component>(componentClass: ComponentClass<T>): T {
+    return this.map.get(componentClass) as T
+  }
+
+  public has(componentClass: Function): boolean {
+    return this.map.has(componentClass)
+  }
+
+  public hasAll(componentClasses: Iterable<Function>): boolean {
+    for (let cls of componentClasses) {
+      if (!this.map.has(cls)) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  public delete(componentClass: Function): void {
+    this.map.delete(componentClass)
+  }
+}
+
+/**
  * A System cares about a set of Components. It will run on every Entity
  * that has that set of Components.
  *
@@ -47,57 +98,6 @@ abstract class System {
 }
 
 /**
- * This type is so functions like the ComponentContainer's get(...) will
- * automatically tell TypeScript the type of the Component returned. In
- * other words, we can say get(Position) and TypeScript will know that an
- * instance of Position was returned. This is amazingly helpful.
- */
-type ComponentClass<T extends Component> = new (...args: any[]) => T
-
-/**
- * This custom container is so that calling code can provide the
- * Component *instance* when adding (e.g., add(new Position(...))), and
- * provide the Component *class* otherwise (e.g., get(Position),
- * has(Position), delete(Position)).
- *
- * Two different types used here to refer to the Component's class:
- * `Function` and `ComponentClass<T>`. We use `Function` in most cases
- * because it is simpler to write. We use `ComponentClass<T>` in the
- * `get()` method, when we want TypeScript to know the type of the
- * instance that is returned. Just think of these both as referring to
- * the same thing: the underlying class of the Component.
- */
-class ComponentsContainer {
-  private map = new Map<Function, Component>()
-
-  public add(component: Component): void {
-    this.map.set(component.constructor, component)
-  }
-
-  public get<T extends Component>(componentClass: ComponentClass<T>): T {
-    return this.map.get(componentClass) as T
-  }
-
-  public has(componentClass: Function): boolean {
-    return this.map.has(componentClass)
-  }
-
-  public hasAll(componentClasses: Iterable<Function>): boolean {
-    for (let cls of componentClasses) {
-      if (!this.map.has(cls)) {
-        return false
-      }
-    }
-
-    return true
-  }
-
-  public delete(componentClass: Function): void {
-    this.map.delete(componentClass)
-  }
-}
-
-/**
  * The ECS is the main driver; it's the backbone of the engine that
  * coordinates Entities, Components, and Systems. Can be one for
  * the game, or different for every level, or multiple
@@ -105,7 +105,7 @@ class ComponentsContainer {
  */
 class ECS {
   // Main state
-  private entities = new Map<Entity, ComponentsContainer>()
+  private entities = new Map<Entity, ComponentContainer>()
   private systems = new Map<System, Set<Entity>>()
 
   // Bookkeeping for entities
@@ -117,7 +117,7 @@ class ECS {
   public addEntity(): Entity {
     const entity = this.nextEntityId
     this.nextEntityId++
-    this.entities.set(entity, new ComponentsContainer())
+    this.entities.set(entity, new ComponentContainer())
     return entity
   }
 
@@ -138,7 +138,7 @@ class ECS {
     this.checkE(entity)
   }
 
-  public getComponents(entity: Entity): ComponentsContainer {
+  public getComponents(entity: Entity): ComponentContainer {
     return this.entities.get(entity)!
   }
 
@@ -167,6 +167,10 @@ class ECS {
     for (let entity of this.entities.keys()) {
       this.checkES(entity, system)
     }
+  }
+
+  public removeSystem(system: System): void {
+    this.systems.delete(system)
   }
 
   /**

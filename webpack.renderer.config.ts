@@ -16,6 +16,7 @@ export const rendererConfig: Configuration = {
   plugins,
   resolve: {
     alias: {
+      '@ecs': path.resolve(__dirname, 'src/ecs'),
       '@scenes': path.resolve(__dirname, 'src/scenes'),
       '@scripts': path.resolve(__dirname, 'src/scripts'),
       '@shared': path.resolve(__dirname, 'src/shared'),
