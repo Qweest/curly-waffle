@@ -8,9 +8,16 @@ type Entity = number
  * A Component is a bundle of state. Each instance of a Component is
  * associated with a single Entity.
  *
- * Components have no API to fulfill.
+ * If a Component wants to support dirty Component optimization, it
+ * manages its own bookkeeping of whether its state has changed,
+ * and calls `dirty()` on itself when it has.
  */
-abstract class Component {}
+abstract class Component {
+  /**
+   * Overridden by ECS once it tracks this Component.
+   */
+  dirty = () => {}
+}
 
 /**
  * This type is so functions like the ComponentContainer's get(...) will
@@ -36,20 +43,20 @@ type ComponentClass<T extends Component> = new (...args: any[]) => T
 class ComponentContainer {
   private map = new Map<Function, Component>()
 
-  public add(component: Component): void {
+  add(component: Component): void {
     this.map.set(component.constructor, component)
   }
 
-  public get<T extends Component>(componentClass: ComponentClass<T>): T {
+  get<T extends Component>(componentClass: ComponentClass<T>): T {
     return this.map.get(componentClass) as T
   }
 
-  public has(componentClass: Function): boolean {
+  has(componentClass: Function): boolean {
     return this.map.has(componentClass)
   }
 
-  public hasAll(componentClasses: Iterable<Function>): boolean {
-    for (let cls of componentClasses) {
+  hasAll(componentClasses: Iterable<Function>): boolean {
+    for (const cls of componentClasses) {
       if (!this.map.has(cls)) {
         return false
       }
@@ -58,7 +65,7 @@ class ComponentContainer {
     return true
   }
 
-  public delete(componentClass: Function): void {
+  delete(componentClass: Function): void {
     this.map.delete(componentClass)
   }
 }
@@ -82,19 +89,27 @@ abstract class System {
    *
    * This should be defined at compile time and should never change.
    */
-  public abstract componentsRequired: Set<Function>
+  abstract componentsRequired: Set<Function>
+
+  /**
+   * Set of Component classes. If *ANY* of them become dirty, the
+   * System will be given that Entity during its update(). Components
+   * here need *not* be tracked by `componentsRequired`. To make this
+   * opt-in, we default this to the empty set.
+   */
+  public dirtyComponents: Set<Function> = new Set()
 
   /**
    * update() is called on the System every frame.
    */
-  public abstract update(entities: Set<Entity>): void
+  abstract update(entities: Set<Entity>, dirty: Set<Entity>): void
 
   /**
    * The ECS is given to all Systems. Systems contain most of the game
    * code, so they need to be able to create, mutate, and destroy
    * Entities and Components.
    */
-  public ecs: ECS = new ECS()
+  ecs: ECS = new ECS()
 }
 
 /**
@@ -108,48 +123,61 @@ class ECS {
   private entities = new Map<Entity, ComponentContainer>()
   private systems = new Map<System, Set<Entity>>()
 
+  // Data structures for dirty Component optimization
+  private dirtySystemsCare = new Map<Function, Set<System>>()
+  private dirtyEntities = new Map<System, Set<Entity>>()
+
   // Bookkeeping for entities
   private nextEntityId = 0
-  private entitiesToDestroy: Entity[] = []
+  private entitiesToDestroy = new Array<Entity>()
 
   // API: Entities
 
-  public addEntity(): Entity {
+  addEntity(): Entity {
     const entity = this.nextEntityId
     this.nextEntityId++
     this.entities.set(entity, new ComponentContainer())
     return entity
   }
 
-  /**
-   * Marks `entity` for removal. The actual removal happens at the end
-   * of the next `update()`. This way we avoid subtle bugs where an
-   * Entity is removed mid-`update()`, with some Systems seeing it and
-   * others not.
-   */
-  public removeEntity(entity: Entity): void {
+  removeEntity(entity: Entity): void {
     this.entitiesToDestroy.push(entity)
   }
 
   // API: Components
 
-  public addComponent(entity: Entity, component: Component): void {
+  addComponent(entity: Entity, component: Component): void {
     this.entities.get(entity)?.add(component)
     this.checkE(entity)
+
+    component.dirty = () => this.componentDirty(entity, component)
+    component.dirty()
   }
 
-  public getComponents(entity: Entity): ComponentContainer {
+  private componentDirty(entity: Entity, component: Component): void {
+    if (!this.dirtySystemsCare.has(component.constructor)) {
+      return
+    }
+
+    for (const system of this.dirtySystemsCare.get(component.constructor)!) {
+      if (this.systems.get(system)?.has(entity)) {
+        this.dirtyEntities.get(system)?.add(entity)
+      }
+    }
+  }
+
+  getComponents(entity: Entity): ComponentContainer {
     return this.entities.get(entity)!
   }
 
-  public removeComponent(entity: Entity, componentClass: Function): void {
+  removeComponent(entity: Entity, componentClass: Function): void {
     this.entities.get(entity)?.delete(componentClass)
     this.checkE(entity)
   }
 
   // API: Systems
 
-  public addSystem(system: System): void {
+  addSystem(system: System): void {
     // Checking invariant: systems should not have an empty
     // Components list, or they'll run on every entity.
     if (system.componentsRequired.size === 0) {
@@ -164,13 +192,19 @@ class ECS {
 
     // Save system and set who it should track immediately.
     this.systems.set(system, new Set())
-    for (let entity of this.entities.keys()) {
+    for (const entity of this.entities.keys()) {
       this.checkES(entity, system)
     }
-  }
 
-  public removeSystem(system: System): void {
-    this.systems.delete(system)
+    // Bookkeeping for dirty Component optimization.
+    for (const c of system.dirtyComponents) {
+      if (!this.dirtySystemsCare.has(c)) {
+        this.dirtySystemsCare.set(c, new Set())
+      }
+
+      this.dirtySystemsCare.get(c)?.add(system)
+    }
+    this.dirtyEntities.set(system, new Set())
   }
 
   /**
@@ -178,10 +212,11 @@ class ECS {
    * updates all Systems, then destroys any Entities that were marked
    * for removal.
    */
-  public update(): void {
+  update(): void {
     // Update all systems
-    for (let [system, entities] of this.systems.entries()) {
-      system.update(entities)
+    for (const [system, entities] of this.systems) {
+      system.update(entities, this.dirtyEntities.get(system)!)
+      this.dirtyEntities.get(system)?.clear()
     }
 
     // Remove any entities that were marked for deletion during the
@@ -195,20 +230,23 @@ class ECS {
 
   private destroyEntity(entity: Entity): void {
     this.entities.delete(entity)
-    for (let entities of this.systems.values()) {
+    for (const [system, entities] of this.systems) {
       entities.delete(entity)
+      if (this.dirtyEntities.has(system)) {
+        this.dirtyEntities.get(system)?.delete(entity)
+      }
     }
   }
 
   private checkE(entity: Entity): void {
-    for (let system of this.systems.keys()) {
+    for (const system of this.systems.keys()) {
       this.checkES(entity, system)
     }
   }
 
   private checkES(entity: Entity, system: System): void {
-    let have = this.entities.get(entity)
-    let need = system.componentsRequired
+    const have = this.entities.get(entity)
+    const need = system.componentsRequired
     if (have?.hasAll(need)) {
       // Should be in system
       this.systems.get(system)?.add(entity)
@@ -218,3 +256,5 @@ class ECS {
     }
   }
 }
+
+export { ECS, Entity, Component, System }
