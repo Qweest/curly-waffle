@@ -232,9 +232,7 @@ class ECS {
     this.entities.delete(entity)
     for (const [system, entities] of this.systems) {
       entities.delete(entity)
-      if (this.dirtyEntities.has(system)) {
-        this.dirtyEntities.get(system)?.delete(entity)
-      }
+      this.dirtyEntities.get(system)?.delete(entity)
     }
   }
 
