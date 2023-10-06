@@ -1,4 +1,5 @@
 import FPSManager from '@scripts/FPSManager'
+import InputManager from '@scripts/InputManager'
 import { MAX_FPS } from '@shared/constants'
 import {
   BoxGeometry,
@@ -21,7 +22,7 @@ class MainScene {
     this.animate = this.animate.bind(this)
   }
 
-  public static getInstance() {
+  static getInstance() {
     if (!MainScene.instance) {
       MainScene.instance = new MainScene()
     }
@@ -48,11 +49,15 @@ class MainScene {
 
     const fpsManager = new FPSManager(MAX_FPS, this.animate)
     fpsManager.start()
+
+    const inputManager = InputManager.getInstance()
+    inputManager.start()
   }
 
   private animate() {
     this.player.rotation.x += 0.01
     this.player.rotation.y += 0.01
+
     this.renderer.render(this.scene, this.camera)
   }
 }

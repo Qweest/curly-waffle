@@ -1,4 +1,3 @@
-import '@ecs/tests'
+import '@ui'
 
 import './index.css'
-import './scenes'

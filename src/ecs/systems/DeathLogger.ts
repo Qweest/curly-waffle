@@ -1,16 +1,15 @@
-import Health from '@ecs/components/Health'
-import Name from '@ecs/components/Name'
+import Components from '@ecs/components'
 import { Entity, System } from '@ecs/index'
 
 class DeathLogger extends System {
-  componentsRequired = new Set([Health, Name])
-  dirtyComponents = new Set([Health])
+  componentsRequired = new Set([Components.Health, Components.Name])
+  dirtyComponents = new Set([Components.Health])
 
   update(entities: Set<Entity>, dirty: Set<Entity>): void {
     for (const entity of dirty) {
-      const health = this.ecs.getComponents(entity).get(Health)
+      const health = this.ecs.getComponents(entity).get(Components.Health)
       if (health.current <= 0) {
-        const name = this.ecs.getComponents(entity).get(Name)
+        const name = this.ecs.getComponents(entity).get(Components.Name)
         console.log(`Entity ${name} is dead`)
       }
     }
